@@ -1,6 +1,6 @@
-﻿# Cinemate ðŸŽ¬
+﻿# Cinemate 
 
-> **AI-powered movie recommendation platform** â€” IMDb's catalog depth, Netflix's personalized rows, YouTube's click-driven live re-ranking.
+> **AI-powered movie recommendation platform** ” IMDb's catalog depth, Netflix's personalized rows, YouTube's click-driven live re-ranking.
 
 [![Architecture](https://img.shields.io/badge/arch-microservices-blue)](#architecture)
 [![ML](https://img.shields.io/badge/ML-SVD%20%2B%20NCF%20%2B%20pgvector-purple)](#ml-models)
