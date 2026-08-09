@@ -1,0 +1,115 @@
+﻿version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: cinemate-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cinemate}
+      POSTGRES_USER: ${POSTGRES_USER:-cinemate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cinemate_secret}
+    ports:
+      - "5433:5432"        # 5433 avoids clash with localrag on 5432 (if any)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cinemate}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: cinemate-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"        # 6380 avoids clash with localrag on 6379 (if any)
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cinemate-backend
+    restart: unless-stopped
+    ports:
+      - "8010:8000"        # 8010 avoids clash with localrag_back on 8000
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cinemate}:${POSTGRES_PASSWORD:-cinemate_secret}@postgres:5432/${POSTGRES_DB:-cinemate}
+      REDIS_URL: redis://redis:6379
+      SECRET_KEY: ${SECRET_KEY:-supersecretkey_change_in_production_please}
+      TMDB_API_KEY: ${TMDB_API_KEY}
+      ML_SERVICE_URL: http://ml-service:8001
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: cinemate-ml
+    restart: unless-stopped
+    ports:
+      - "8011:8001"        # 8011 avoids clash with localrag services
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cinemate}:${POSTGRES_PASSWORD:-cinemate_secret}@postgres:5432/${POSTGRES_DB:-cinemate}
+      REDIS_URL: redis://redis:6379
+      TMDB_API_KEY: ${TMDB_API_KEY}
+      MODEL_DIR: /app/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./ml-service:/app
+      - ml_models:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8010   # points to backend's new host port
+    container_name: cinemate-frontend
+    restart: unless-stopped
+    ports:
+      - "3010:80"          # 3010 avoids clash with localrag_front on 3000
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+  ml_models:
+
