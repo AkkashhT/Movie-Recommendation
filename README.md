@@ -281,3 +281,6 @@ VITE_API_URL=http://localhost:8000
 | Error states | `ErrorState` component with retry button on every page |
 | RBAC | `USER` / `ADMIN` roles; admin routes protected via `require_admin` dependency |
 | JWT rotation | Refresh tokens hashed in DB; rotated on every use |
+
+
+Author: Akash T
